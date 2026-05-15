@@ -16,7 +16,38 @@ app.use('/api/auth', authRouter);
 app.use('/api/match', matchRouter);
 
 app.get('/health', (_req, res) => {
-  res.json({ success: true, message: 'Matchmaking API running' });
+  const dbState = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  res.json({
+    success: true,
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    database: dbState[mongoose.connection.readyState] ?? 'unknown',
+  });
+});
+
+app.get('/test', async (_req, res) => {
+  const dbConnected = mongoose.connection.readyState === 1;
+  let dbPing = false;
+  if (dbConnected) {
+    try {
+      await mongoose.connection.db!.admin().ping();
+      dbPing = true;
+    } catch {
+      dbPing = false;
+    }
+  }
+  const allOk = dbConnected && dbPing;
+  res.status(allOk ? 200 : 503).json({
+    success: allOk,
+    message: allOk ? 'All systems operational' : 'Some checks failed',
+    checks: {
+      api: 'ok',
+      database: dbConnected ? 'ok' : 'error',
+      dbPing: dbPing ? 'ok' : 'error',
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 async function dropStaleIndexes() {
