@@ -7,6 +7,7 @@ import {
   refresh,
   logout,
   getMe,
+  getUserById,
   updateProfile,
   deleteAccount,
 } from '../controllers/auth.controller';
@@ -18,6 +19,7 @@ router.post('/verify-otp', otpRateLimiter, verifyOtp);
 router.post('/refresh', refresh);
 router.post('/logout', verifyToken, logout);
 router.get('/me', verifyToken, getMe);
+router.get('/user/:id', verifyToken, getUserById);
 router.put('/update-profile', verifyToken, updateProfile);
 router.post('/profile', verifyToken, updateProfile);
 router.delete('/delete-account', verifyToken, deleteAccount);

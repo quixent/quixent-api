@@ -7,6 +7,7 @@ import {
   refreshTokenService,
   logoutService,
   getMeService,
+  getUserByIdService,
   updateProfileService,
   deleteAccountService,
 } from '../services/auth.service';
@@ -41,6 +42,7 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
     });
     sendSuccess(res, result.isNewUser ? 'Registered successfully' : 'Login successful', {
       isNewUser: result.isNewUser,
+      profileComplete: !!result.user.name,
       accessToken: result.accessToken,
       token: result.accessToken,
       user: result.user,
@@ -78,6 +80,15 @@ export const logout = async (req: AuthRequest, res: Response): Promise<void> => 
 export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await getMeService(req.user!.userId);
+    sendSuccess(res, 'User fetched', { user });
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to fetch user', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const getUserById = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await getUserByIdService(req.params.id);
     sendSuccess(res, 'User fetched', { user });
   } catch (err: any) {
     sendError(res, err.message ?? 'Failed to fetch user', err.error ?? 'SERVER_ERROR', err.status ?? 500);

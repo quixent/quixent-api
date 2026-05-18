@@ -49,9 +49,6 @@ export const sendOtpService = async (mobile: string) => {
     { upsert: true, new: true },
   );
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`\n📱 OTP for ${mobile}: ${code}\n`);
-  }
   await sendOtpSms(mobile, code);
 };
 
@@ -148,6 +145,14 @@ export const logoutService = async (userId: string, refreshToken: string) => {
 
 export const getMeService = async (userId: string) => {
   const user = await User.findById(userId).select('-__v');
+  if (!user) {
+    throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
+  }
+  return user;
+};
+
+export const getUserByIdService = async (userId: string) => {
+  const user = await User.findById(userId).select('name gender age city');
   if (!user) {
     throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
   }

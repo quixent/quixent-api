@@ -1,8 +1,7 @@
-const API_KEY   = process.env.TWOFACTOR_API_KEY as string;
-const SENDER_ID = process.env.TWOFACTOR_SENDER_ID as string;
-
-const OTP_TEMPLATE_NAME    = 'General Otp';
-const THANKS_TEMPLATE_NAME = 'General Thanking Template';
+const API_KEY              = process.env.TWOFACTOR_API_KEY as string;
+const SENDER_ID            = process.env.TWOFACTOR_SENDER_ID as string;
+const OTP_TEMPLATE_NAME    = process.env.TWOFACTOR_OTP_TEMPLATE ?? 'General Otp';
+const THANKS_TEMPLATE_NAME = process.env.TWOFACTOR_THANKS_TEMPLATE ?? 'General Thanking Template';
 
 const THANKS_MESSAGE = () =>
   `Dear User, thank you for choosing us. Thank you for your support-QUIXENT DELIVERABLES PRIVATE LIMITED`;

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
-const WINDOW_MS   = 15 * 60 * 1000; // 15 minutes
-const MAX_REQUESTS = 3;
+const WINDOW_MS    = 15 * 60 * 1000;
+const MAX_REQUESTS = process.env.NODE_ENV === 'development' ? 20 : 3;
 
 const store = new Map<string, { count: number; resetAt: number }>();
 
