@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { connectDB } from './config/db';
 import authRouter from './routes/auth.routes';
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 const PORT = process.env.PORT ?? 5000;
@@ -28,6 +29,8 @@ app.use('/api/match', createProxyMiddleware({
 app.get('/health', (_req, res) => {
   res.json({ success: true, status: 'ok', uptime: Math.floor(process.uptime()) });
 });
+
+app.use(errorHandler);
 
 async function start() {
   await connectDB();

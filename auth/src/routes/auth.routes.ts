@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
+import { otpRateLimiter } from '../middleware/rateLimiter';
 import {
   sendOtp,
   verifyOtp,
@@ -12,8 +13,8 @@ import {
 
 const router = Router();
 
-router.post('/send-otp', sendOtp);
-router.post('/verify-otp', verifyOtp);
+router.post('/send-otp', otpRateLimiter, sendOtp);
+router.post('/verify-otp', otpRateLimiter, verifyOtp);
 router.post('/refresh', refresh);
 router.post('/logout', verifyToken, logout);
 router.get('/me', verifyToken, getMe);

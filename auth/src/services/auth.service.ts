@@ -6,6 +6,7 @@ import Token from '../models/Token';
 import { generateOtp } from '../utils/generateOtp';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateTokens';
 import { RefreshTokenPayload } from '../types';
+import { sendOtpSms } from './sms.service';
 
 const OTP_EXPIRY_MS        = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS      = 60 * 1000;
@@ -51,7 +52,7 @@ export const sendOtpService = async (mobile: string) => {
   if (process.env.NODE_ENV === 'development') {
     console.log(`\n📱 OTP for ${mobile}: ${code}\n`);
   }
-  // TODO: replace with sms.service.ts call in production
+  await sendOtpSms(mobile, code);
 };
 
 export const verifyOtpService = async (mobile: string, code: string) => {
