@@ -4,7 +4,6 @@ import cors from 'cors';
 import { connectDB } from './config/db';
 import matchRouter from './routes/match.routes';
 import questionRouter from './routes/question.routes';
-import { seedQuestions } from './seed';
 
 const app = express();
 const PORT = process.env.PORT ?? 5001;
@@ -22,7 +21,6 @@ app.get('/health', (_req, res) => {
 
 async function start() {
   await connectDB();
-  await seedQuestions();
   app.listen(PORT, () => {
     console.log(`🚀 Match Calculator API running on http://localhost:${PORT}`);
   });

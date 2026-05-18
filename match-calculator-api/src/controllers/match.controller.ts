@@ -79,7 +79,8 @@ export const connectByCode = async (req: AuthRequest, res: Response): Promise<vo
 
 export const getMyMatches = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const matches = await getMyMatchesService(req.user!.userId);
+    const token = req.headers.authorization ?? '';
+    const matches = await getMyMatchesService(req.user!.userId, token);
     sendSuccess(res, 'Matches fetched', { matches });
   } catch (err: any) {
     sendError(res, err.message ?? 'Failed to fetch matches', err.error ?? 'SERVER_ERROR', err.status ?? 500);

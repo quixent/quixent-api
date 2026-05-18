@@ -1,10 +1,23 @@
 import mongoose from 'mongoose';
+import axios from 'axios';
 import Match from '../models/Match';
 import Answer from '../models/Answer';
 import ConnectCode from '../models/ConnectCode';
 import Question from '../models/Question';
 import Message from '../models/Message';
 import { ScoreResult, ActiveMatch, ChatMessage } from '../types';
+
+async function fetchUserProfile(userId: string, token: string) {
+  try {
+    const res = await axios.get(`${process.env.AUTH_API_URL}/api/auth/user/${userId}`, {
+      headers: { Authorization: token },
+      timeout: 3000,
+    });
+    return res.data?.data?.user ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const CODE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
@@ -59,17 +72,22 @@ export const sendMatchRequestService = async (senderId: string, code: string) =>
   return match;
 };
 
-export const getMyMatchesService = async (userId: string): Promise<ActiveMatch[]> => {
+export const getMyMatchesService = async (userId: string, token: string): Promise<ActiveMatch[]> => {
   const [matches, questions] = await Promise.all([
     Match.find({ $or: [{ senderId: userId }, { receiverId: userId }] }).sort({ createdAt: -1 }),
     Question.find(),
   ]);
   const totalQuestions = questions.length;
 
+  const partnerIds = [...new Set(matches.map((m) => m.senderId === userId ? m.receiverId : m.senderId))];
+  const partnerProfiles = await Promise.all(partnerIds.map((id) => fetchUserProfile(id, token)));
+  const profileMap = new Map(partnerIds.map((id, i) => [id, partnerProfiles[i]]));
+
   return Promise.all(
     matches.map(async (match) => {
       const matchObjId = match._id as mongoose.Types.ObjectId;
       const partnerId = match.senderId === userId ? match.receiverId : match.senderId;
+      const profile = profileMap.get(partnerId);
 
       const [myAnswers, partnerAnswers, messageCount] = await Promise.all([
         Answer.countDocuments({ matchId: matchObjId, userId }),
@@ -80,7 +98,7 @@ export const getMyMatchesService = async (userId: string): Promise<ActiveMatch[]
       return {
         matchId: matchObjId.toString(),
         status: match.status,
-        partner: null,
+        partner: profile ? { name: profile.name, gender: profile.gender, age: profile.age } : null,
         progress: { totalQuestions, myAnswers, partnerAnswers },
         messageCount,
       };

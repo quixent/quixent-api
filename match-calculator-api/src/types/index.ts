@@ -32,7 +32,7 @@ export interface IAnswer {
 export interface ActiveMatch {
   matchId: string;
   status: MatchStatus;
-  partner: null;
+  partner: { name: string; gender: string; age: number } | null;
   progress: {
     totalQuestions: number;
     myAnswers: number;
