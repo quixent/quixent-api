@@ -20,7 +20,7 @@ export const verifyToken = async (req: AuthRequest, res: Response, next: NextFun
   }
 
   try {
-    const response = await axios.get(`${process.env.AUTH_API_URL}/auth/me`, {
+    const response = await axios.get(`${process.env.AUTH_API_URL}/api/auth/me`, {
       headers: { Authorization: header },
     });
     const u = response.data.data.user;

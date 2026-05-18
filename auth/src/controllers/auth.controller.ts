@@ -42,6 +42,7 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
     sendSuccess(res, result.isNewUser ? 'Registered successfully' : 'Login successful', {
       isNewUser: result.isNewUser,
       accessToken: result.accessToken,
+      token: result.accessToken,
       user: result.user,
     });
   } catch (err: any) {

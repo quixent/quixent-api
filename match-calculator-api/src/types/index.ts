@@ -29,6 +29,25 @@ export interface IAnswer {
   optionId: string;
 }
 
+export interface ActiveMatch {
+  matchId: string;
+  status: MatchStatus;
+  partner: null;
+  progress: {
+    totalQuestions: number;
+    myAnswers: number;
+    partnerAnswers: number;
+  };
+  messageCount: number;
+}
+
+export interface ChatMessage {
+  _id: string;
+  senderId: { _id: string; name: string };
+  text: string;
+  createdAt: string;
+}
+
 export interface ScoreResult {
   compatibility: number;
   totalQuestions: number;

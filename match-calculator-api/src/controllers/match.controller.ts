@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/verifyToken';
 import { sendSuccess, sendError } from '../utils/apiResponse';
+import { getQuestionsForMatchService } from '../services/question.service';
 import {
   generateConnectCodeService,
   getMyConnectCodeService,
@@ -9,13 +10,28 @@ import {
   getMatchByIdService,
   respondToMatchService,
   submitAnswersService,
+  submitSingleAnswerService,
   getScoreService,
+  getMessagesService,
+  sendMessageService,
 } from '../services/match.service';
 
 export const generateConnectCode = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const connectCode = await generateConnectCodeService(req.user!.userId);
     sendSuccess(res, 'Connect code generated', { connectCode });
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to generate code', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const generateConnectCodeFlat = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const connectCode = await generateConnectCodeService(req.user!.userId);
+    sendSuccess(res, 'Connect code generated', {
+      code: connectCode.code,
+      expiresAt: connectCode.expiresAt.toISOString(),
+    });
   } catch (err: any) {
     sendError(res, err.message ?? 'Failed to generate code', err.error ?? 'SERVER_ERROR', err.status ?? 500);
   }
@@ -41,6 +57,23 @@ export const sendMatchRequest = async (req: AuthRequest, res: Response): Promise
     sendSuccess(res, 'Match request sent', { match }, 201);
   } catch (err: any) {
     sendError(res, err.message ?? 'Failed to send match request', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const connectByCode = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      sendError(res, 'Connect code is required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const match = await sendMatchRequestService(req.user!.userId, code);
+    sendSuccess(res, 'Match request sent', {
+      matchId: (match._id as any).toString(),
+      partnerName: null,
+    }, 201);
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to connect', err.error ?? 'SERVER_ERROR', err.status ?? 500);
   }
 };
 
@@ -94,11 +127,81 @@ export const submitAnswers = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+export const submitSingleAnswer = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { questionId, optionId, matchId } = req.body;
+    if (!questionId || !optionId || !matchId) {
+      sendError(res, 'questionId, optionId, and matchId are required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const result = await submitSingleAnswerService(matchId, req.user!.userId, questionId, optionId);
+    sendSuccess(res, 'Answer submitted', result);
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to submit answer', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
 export const getScore = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const score = await getScoreService(req.params.id, req.user!.userId);
     sendSuccess(res, 'Score fetched', { score });
   } catch (err: any) {
     sendError(res, err.message ?? 'Failed to fetch score', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const getScoreByQuery = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { matchId } = req.query;
+    if (!matchId || typeof matchId !== 'string') {
+      sendError(res, 'matchId is required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const score = await getScoreService(matchId, req.user!.userId);
+    sendSuccess(res, 'Score fetched', score);
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to fetch score', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const getQuestionsFlat = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { matchId } = req.query;
+    if (!matchId || typeof matchId !== 'string') {
+      sendError(res, 'matchId is required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const data = await getQuestionsForMatchService(matchId, req.user!.userId);
+    sendSuccess(res, 'Questions fetched', data);
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to fetch questions', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { matchId } = req.query;
+    if (!matchId || typeof matchId !== 'string') {
+      sendError(res, 'matchId is required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const messages = await getMessagesService(matchId, req.user!.userId);
+    sendSuccess(res, 'Messages fetched', { messages, matchId });
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to fetch messages', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const sendMessage = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { text, matchId } = req.body;
+    if (!text || !matchId) {
+      sendError(res, 'text and matchId are required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const message = await sendMessageService(matchId, req.user!.userId, req.user!.name, text);
+    sendSuccess(res, 'Message sent', { message }, 201);
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to send message', err.error ?? 'SERVER_ERROR', err.status ?? 500);
   }
 };

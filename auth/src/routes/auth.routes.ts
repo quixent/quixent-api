@@ -18,6 +18,7 @@ router.post('/refresh', refresh);
 router.post('/logout', verifyToken, logout);
 router.get('/me', verifyToken, getMe);
 router.put('/update-profile', verifyToken, updateProfile);
+router.post('/profile', verifyToken, updateProfile);
 router.delete('/delete-account', verifyToken, deleteAccount);
 
 export default router;

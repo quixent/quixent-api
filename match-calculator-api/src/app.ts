@@ -9,7 +9,8 @@ import { seedQuestions } from './seed';
 const app = express();
 const PORT = process.env.PORT ?? 5001;
 
-app.use(cors());
+const allowedOrigins = (process.env.CLIENT_ORIGINS ?? 'http://localhost:3000,http://localhost:8081').split(',').map((o) => o.trim());
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 app.use('/match', matchRouter);

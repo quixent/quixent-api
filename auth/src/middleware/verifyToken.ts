@@ -14,11 +14,20 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
   }
 
   const token = header.split(' ')[1];
-  try {
-    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as JwtPayload;
-    req.user = payload;
-    next();
-  } catch {
-    res.status(401).json({ success: false, message: 'Invalid or expired token', error: 'TOKEN_INVALID' });
+  const secrets = [
+    process.env.JWT_ACCESS_SECRET,
+    process.env.JWT_SECRET,
+  ].filter(Boolean) as string[];
+
+  for (const secret of secrets) {
+    try {
+      const payload = jwt.verify(token, secret) as JwtPayload;
+      req.user = payload;
+      next();
+      return;
+    } catch {
+      // try next secret
+    }
   }
+  res.status(401).json({ success: false, message: 'Invalid or expired token', error: 'TOKEN_INVALID' });
 };

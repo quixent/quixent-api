@@ -3,7 +3,8 @@ import Match from '../models/Match';
 import Answer from '../models/Answer';
 import ConnectCode from '../models/ConnectCode';
 import Question from '../models/Question';
-import { ScoreResult } from '../types';
+import Message from '../models/Message';
+import { ScoreResult, ActiveMatch, ChatMessage } from '../types';
 
 const CODE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
@@ -54,14 +55,37 @@ export const sendMatchRequestService = async (senderId: string, code: string) =>
     throw { status: 409, message: 'Match request already exists.', error: 'MATCH_EXISTS' };
   }
 
-  const match = await Match.create({ senderId, receiverId });
+  const match = await Match.create({ senderId, receiverId, status: 'accepted' });
   return match;
 };
 
-export const getMyMatchesService = async (userId: string) => {
-  return Match.find({
-    $or: [{ senderId: userId }, { receiverId: userId }],
-  }).sort({ createdAt: -1 });
+export const getMyMatchesService = async (userId: string): Promise<ActiveMatch[]> => {
+  const [matches, questions] = await Promise.all([
+    Match.find({ $or: [{ senderId: userId }, { receiverId: userId }] }).sort({ createdAt: -1 }),
+    Question.find(),
+  ]);
+  const totalQuestions = questions.length;
+
+  return Promise.all(
+    matches.map(async (match) => {
+      const matchObjId = match._id as mongoose.Types.ObjectId;
+      const partnerId = match.senderId === userId ? match.receiverId : match.senderId;
+
+      const [myAnswers, partnerAnswers, messageCount] = await Promise.all([
+        Answer.countDocuments({ matchId: matchObjId, userId }),
+        Answer.countDocuments({ matchId: matchObjId, userId: partnerId }),
+        Message.countDocuments({ matchId: matchObjId }),
+      ]);
+
+      return {
+        matchId: matchObjId.toString(),
+        status: match.status,
+        partner: null,
+        progress: { totalQuestions, myAnswers, partnerAnswers },
+        messageCount,
+      };
+    }),
+  );
 };
 
 export const getMatchByIdService = async (matchId: string, userId: string) => {
@@ -122,7 +146,6 @@ export const submitAnswersService = async (
 
   await Answer.bulkWrite(ops);
 
-  // check if both users answered all questions → mark complete + calculate score
   const questions = await Question.find();
   const totalQuestions = questions.length;
 
@@ -139,6 +162,48 @@ export const submitAnswersService = async (
   return { message: 'Answers submitted successfully' };
 };
 
+export const submitSingleAnswerService = async (
+  matchId: string,
+  userId: string,
+  questionId: string,
+  optionId: string,
+): Promise<{ answered: number; total: number }> => {
+  const match = await Match.findById(matchId);
+  if (!match) {
+    throw { status: 404, message: 'Match not found.', error: 'MATCH_NOT_FOUND' };
+  }
+  if (match.senderId !== userId && match.receiverId !== userId) {
+    throw { status: 403, message: 'Access denied.', error: 'UNAUTHORIZED' };
+  }
+  if (match.status !== 'accepted') {
+    throw { status: 400, message: 'Match must be accepted before answering.', error: 'INVALID_STATUS' };
+  }
+
+  const matchObjId = new mongoose.Types.ObjectId(matchId);
+
+  await Answer.findOneAndUpdate(
+    { matchId: matchObjId, userId, questionId: new mongoose.Types.ObjectId(questionId) },
+    { matchId, userId, questionId, optionId },
+    { upsert: true },
+  );
+
+  const questions = await Question.find();
+  const total = questions.length;
+  const answered = await Answer.countDocuments({ matchId: matchObjId, userId });
+
+  const senderAnswers = await Answer.countDocuments({ matchId: matchObjId, userId: match.senderId });
+  const receiverAnswers = await Answer.countDocuments({ matchId: matchObjId, userId: match.receiverId });
+
+  if (senderAnswers >= total && receiverAnswers >= total && match.status === 'accepted') {
+    const score = await calculateCompatibilityScore(matchId, match.senderId, match.receiverId);
+    match.status = 'complete';
+    match.compatibilityScore = score.compatibility;
+    await match.save();
+  }
+
+  return { answered, total };
+};
+
 export const getScoreService = async (matchId: string, userId: string): Promise<ScoreResult> => {
   const match = await Match.findById(matchId);
   if (!match) {
@@ -153,6 +218,45 @@ export const getScoreService = async (matchId: string, userId: string): Promise<
 
   const partnerId = match.senderId === userId ? match.receiverId : match.senderId;
   return calculateCompatibilityScore(matchId, userId, partnerId);
+};
+
+export const getMessagesService = async (matchId: string, userId: string): Promise<ChatMessage[]> => {
+  const match = await Match.findById(matchId);
+  if (!match) {
+    throw { status: 404, message: 'Match not found.', error: 'MATCH_NOT_FOUND' };
+  }
+  if (match.senderId !== userId && match.receiverId !== userId) {
+    throw { status: 403, message: 'Access denied.', error: 'UNAUTHORIZED' };
+  }
+  const messages = await Message.find({ matchId: new mongoose.Types.ObjectId(matchId) }).sort({ createdAt: 1 });
+  return messages.map((m) => ({
+    _id: (m._id as mongoose.Types.ObjectId).toString(),
+    senderId: { _id: m.senderId, name: m.senderName },
+    text: m.text,
+    createdAt: m.createdAt.toISOString(),
+  }));
+};
+
+export const sendMessageService = async (
+  matchId: string,
+  userId: string,
+  senderName: string,
+  text: string,
+): Promise<ChatMessage> => {
+  const match = await Match.findById(matchId);
+  if (!match) {
+    throw { status: 404, message: 'Match not found.', error: 'MATCH_NOT_FOUND' };
+  }
+  if (match.senderId !== userId && match.receiverId !== userId) {
+    throw { status: 403, message: 'Access denied.', error: 'UNAUTHORIZED' };
+  }
+  const message = await Message.create({ matchId, senderId: userId, senderName, text });
+  return {
+    _id: (message._id as mongoose.Types.ObjectId).toString(),
+    senderId: { _id: userId, name: senderName },
+    text: message.text,
+    createdAt: message.createdAt.toISOString(),
+  };
 };
 
 async function calculateCompatibilityScore(

@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { connectDB } from './config/db';
 import authRouter from './routes/auth.routes';
 
@@ -16,7 +17,13 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-app.use('/auth', authRouter);
+app.use('/api/auth', authRouter);
+
+app.use('/api/match', createProxyMiddleware({
+  target: process.env.MATCH_API_URL ?? 'http://localhost:5001',
+  changeOrigin: true,
+  pathRewrite: { '^/api/match': '/match' },
+}));
 
 app.get('/health', (_req, res) => {
   res.json({ success: true, status: 'ok', uptime: Math.floor(process.uptime()) });
