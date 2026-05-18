@@ -1,0 +1,177 @@
+import jwt from 'jsonwebtoken';
+import User from '../models/User';
+import Otp from '../models/Otp';
+import OtpRateLimit from '../models/OtpRateLimit';
+import Token from '../models/Token';
+import { generateOtp } from '../utils/generateOtp';
+import { generateAccessToken, generateRefreshToken } from '../utils/generateTokens';
+import { RefreshTokenPayload } from '../types';
+
+const OTP_EXPIRY_MS        = 5 * 60 * 1000;
+const OTP_COOLDOWN_MS      = 60 * 1000;
+const MAX_DAILY_REQUESTS   = 10;
+const MAX_ATTEMPTS         = 5;
+const RATE_LIMIT_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+export const sendOtpService = async (mobile: string) => {
+  const rateLimit = await OtpRateLimit.findOne({ mobile });
+
+  if (rateLimit) {
+    const secsSinceLast = (Date.now() - rateLimit.lastRequestAt.getTime()) / 1000;
+
+    if (secsSinceLast < OTP_COOLDOWN_MS / 1000) {
+      const waitSecs = Math.ceil(OTP_COOLDOWN_MS / 1000 - secsSinceLast);
+      throw { status: 429, message: `Please wait ${waitSecs} second${waitSecs !== 1 ? 's' : ''} before requesting another OTP`, error: 'OTP_RESEND_LIMIT' };
+    }
+
+    if (rateLimit.dailyRequestCount >= MAX_DAILY_REQUESTS) {
+      throw { status: 429, message: `Daily OTP limit reached. Try again tomorrow.`, error: 'OTP_RESEND_LIMIT' };
+    }
+  }
+
+  const code = generateOtp();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MS);
+
+  await Otp.findOneAndUpdate(
+    { mobile },
+    { mobile, code, attempts: 0, expiresAt },
+    { upsert: true, new: true },
+  );
+
+  await OtpRateLimit.findOneAndUpdate(
+    { mobile },
+    {
+      $set: { mobile, lastRequestAt: now, expiresAt: new Date(now.getTime() + RATE_LIMIT_EXPIRY_MS) },
+      $inc: { dailyRequestCount: 1 },
+    },
+    { upsert: true, new: true },
+  );
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`\n📱 OTP for ${mobile}: ${code}\n`);
+  }
+  // TODO: replace with sms.service.ts call in production
+};
+
+export const verifyOtpService = async (mobile: string, code: string) => {
+  const otp = await Otp.findOne({ mobile });
+
+  if (!otp) {
+    throw { status: 400, message: 'OTP not found or expired. Please request a new OTP.', error: 'OTP_INVALID' };
+  }
+
+  if (Date.now() > otp.expiresAt.getTime()) {
+    await Otp.deleteOne({ mobile });
+    throw { status: 400, message: 'OTP expired. Please request a new OTP.', error: 'OTP_INVALID' };
+  }
+
+  if (otp.attempts >= MAX_ATTEMPTS) {
+    await Otp.deleteOne({ mobile });
+    throw { status: 400, message: 'Too many failed attempts. Please request a new OTP.', error: 'OTP_MAX_ATTEMPTS' };
+  }
+
+  if (otp.code !== String(code).trim()) {
+    otp.attempts += 1;
+    await otp.save();
+    const remaining = MAX_ATTEMPTS - otp.attempts;
+    throw { status: 400, message: `Invalid OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`, error: 'OTP_INVALID' };
+  }
+
+  await Otp.deleteOne({ mobile });
+
+  let user = await User.findOne({ mobile });
+  const isNewUser = !user;
+
+  if (!user) {
+    user = await User.create({ mobile });
+  } else {
+    user.lastLogin = new Date();
+    await user.save();
+  }
+
+  if (!user.isActive) {
+    throw { status: 403, message: 'Account is deactivated.', error: 'USER_INACTIVE' };
+  }
+
+  const accessToken = generateAccessToken(user._id.toString(), user.mobile);
+  const refreshToken = generateRefreshToken(user._id.toString());
+
+  await Token.create({
+    userId: user._id,
+    token: refreshToken,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  return {
+    isNewUser,
+    accessToken,
+    refreshToken,
+    user: {
+      _id: user._id,
+      mobile: user.mobile,
+      name: user.name,
+      gender: user.gender,
+      age: user.age,
+      role: user.role,
+    },
+  };
+};
+
+export const refreshTokenService = async (refreshToken: string) => {
+  const tokenDoc = await Token.findOne({ token: refreshToken });
+  if (!tokenDoc) {
+    throw { status: 401, message: 'Invalid or expired refresh token.', error: 'REFRESH_INVALID' };
+  }
+
+  let payload: RefreshTokenPayload;
+  try {
+    payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string) as RefreshTokenPayload;
+  } catch {
+    await Token.deleteOne({ token: refreshToken });
+    throw { status: 401, message: 'Refresh token expired. Please login again.', error: 'REFRESH_INVALID' };
+  }
+
+  const user = await User.findById(payload.userId);
+  if (!user || !user.isActive) {
+    throw { status: 403, message: 'User not found or inactive.', error: 'USER_INACTIVE' };
+  }
+
+  const newAccessToken = generateAccessToken(user._id.toString(), user.mobile);
+  return { accessToken: newAccessToken };
+};
+
+export const logoutService = async (userId: string, refreshToken: string) => {
+  await Token.deleteOne({ userId, token: refreshToken });
+};
+
+export const getMeService = async (userId: string) => {
+  const user = await User.findById(userId).select('-__v');
+  if (!user) {
+    throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
+  }
+  return user;
+};
+
+export const updateProfileService = async (
+  userId: string,
+  data: { name?: string; gender?: string; age?: number; city?: string; bio?: string },
+) => {
+  if (data.gender && !['male', 'female'].includes(data.gender)) {
+    throw { status: 400, message: 'gender must be male or female.', error: 'INVALID_INPUT' };
+  }
+  if (data.age !== undefined && (data.age < 18 || data.age > 80)) {
+    throw { status: 400, message: 'age must be between 18 and 80.', error: 'INVALID_INPUT' };
+  }
+
+  const user = await User.findByIdAndUpdate(userId, data, { new: true }).select('-__v');
+  if (!user) {
+    throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
+  }
+  return user;
+};
+
+export const deleteAccountService = async (userId: string) => {
+  await User.findByIdAndUpdate(userId, { isActive: false });
+  await Token.deleteMany({ userId });
+};
