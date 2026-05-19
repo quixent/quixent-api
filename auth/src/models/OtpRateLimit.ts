@@ -1,4 +1,5 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import { Document, Schema } from 'mongoose';
+import { authDb } from '../config/db';
 
 export interface IOtpRateLimit extends Document {
   mobile: string;
@@ -17,4 +18,4 @@ const OtpRateLimitSchema = new Schema<IOtpRateLimit>({
 // Auto-delete after 24 hours
 OtpRateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.model<IOtpRateLimit>('OtpRateLimit', OtpRateLimitSchema);
+export default authDb.model<IOtpRateLimit>('OtpRateLimit', OtpRateLimitSchema);

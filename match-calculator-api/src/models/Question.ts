@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { matchDb } from '../config/db';
 
 export interface IOptionDocument {
   _id: mongoose.Types.ObjectId;
@@ -23,4 +24,4 @@ const QuestionSchema = new Schema<IQuestionDocument>({
   options: { type: [OptionSchema], required: true },
 });
 
-export default mongoose.model<IQuestionDocument>('Question', QuestionSchema);
+export default matchDb.model<IQuestionDocument>('Question', QuestionSchema);

@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { matchDb } from '../config/db';
 
 export interface IMessageDocument extends Document {
   matchId: mongoose.Types.ObjectId;
@@ -20,4 +21,4 @@ const MessageSchema = new Schema<IMessageDocument>(
 
 MessageSchema.index({ matchId: 1, createdAt: 1 });
 
-export default mongoose.model<IMessageDocument>('Message', MessageSchema);
+export default matchDb.model<IMessageDocument>('Message', MessageSchema);

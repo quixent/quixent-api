@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "index.ts",
+    "auth/index.ts",
+    "auth/src/**/*.ts",
+    "match-calculator-api/index.ts",
+    "match-calculator-api/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "auth/node_modules",
+    "match-calculator-api/node_modules"
+  ]
+}

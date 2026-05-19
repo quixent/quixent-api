@@ -1,8 +1,11 @@
-import mongoose from 'mongoose';
+import mongoose, { Connection } from 'mongoose';
 
-export const connectDB = async (): Promise<void> => {
-  const mongoUri = process.env.MONGO_URI;
-  if (!mongoUri) throw new Error('MONGO_URI is not set in .env');
-  await mongoose.connect(mongoUri);
-  console.log('✅ MongoDB connected');
+export let matchDb: Connection;
+
+export const connectMatchDB = async (): Promise<void> => {
+  const mongoUri = process.env.MATCH_MONGO_URI;
+  if (!mongoUri) throw new Error('MATCH_MONGO_URI is not set in .env');
+  matchDb = mongoose.createConnection(mongoUri);
+  await matchDb.asPromise();
+  console.log('✅ Match MongoDB connected');
 };

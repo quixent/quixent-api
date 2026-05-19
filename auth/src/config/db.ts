@@ -1,8 +1,11 @@
-import mongoose from 'mongoose';
+import mongoose, { Connection } from 'mongoose';
 
-export const connectDB = async (): Promise<void> => {
-  const mongoUri = process.env.MONGO_URI;
-  if (!mongoUri) throw new Error('MONGO_URI is not set in .env');
-  await mongoose.connect(mongoUri);
-  console.log('✅ MongoDB connected');
+export let authDb: Connection;
+
+export const connectAuthDB = async (): Promise<void> => {
+  const mongoUri = process.env.AUTH_MONGO_URI;
+  if (!mongoUri) throw new Error('AUTH_MONGO_URI is not set in .env');
+  authDb = mongoose.createConnection(mongoUri);
+  await authDb.asPromise();
+  console.log('✅ Auth MongoDB connected');
 };

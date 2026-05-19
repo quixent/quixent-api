@@ -9,7 +9,7 @@ import { ScoreResult, ActiveMatch, ChatMessage } from '../types';
 
 async function fetchUserProfile(userId: string, token: string) {
   try {
-    const res = await axios.get(`${process.env.AUTH_API_URL}/api/auth/user/${userId}`, {
+    const res = await axios.get(`${process.env.AUTH_API_URL}/auth/user/${userId}`, {
       headers: { Authorization: token },
       timeout: 3000,
     });

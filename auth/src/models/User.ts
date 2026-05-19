@@ -1,5 +1,6 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import { Document, Schema } from 'mongoose';
 import { Gender } from '../types';
+import { authDb } from '../config/db';
 
 export interface IUserDocument extends Document {
   mobile: string;
@@ -29,4 +30,4 @@ const UserSchema = new Schema<IUserDocument>(
   { timestamps: true },
 );
 
-export default mongoose.model<IUserDocument>('User', UserSchema);
+export default authDb.model<IUserDocument>('User', UserSchema);

@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { matchDb } from '../config/db';
 
 export interface IAnswerDocument extends Document {
   matchId: mongoose.Types.ObjectId;
@@ -19,4 +20,4 @@ const AnswerSchema = new Schema<IAnswerDocument>(
 
 AnswerSchema.index({ matchId: 1, userId: 1, questionId: 1 }, { unique: true });
 
-export default mongoose.model<IAnswerDocument>('Answer', AnswerSchema);
+export default matchDb.model<IAnswerDocument>('Answer', AnswerSchema);

@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { authDb } from '../config/db';
 
 export interface ITokenDocument extends Document {
   userId: mongoose.Types.ObjectId;
@@ -17,4 +18,4 @@ const TokenSchema = new Schema<ITokenDocument>(
 
 TokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.model<ITokenDocument>('Token', TokenSchema);
+export default authDb.model<ITokenDocument>('Token', TokenSchema);

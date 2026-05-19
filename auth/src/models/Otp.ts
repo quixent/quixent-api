@@ -1,4 +1,5 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import { Document, Schema } from 'mongoose';
+import { authDb } from '../config/db';
 
 export interface IOtpDocument extends Document {
   mobile: string;
@@ -16,4 +17,4 @@ const OtpSchema = new Schema<IOtpDocument>({
 
 OtpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.model<IOtpDocument>('Otp', OtpSchema);
+export default authDb.model<IOtpDocument>('Otp', OtpSchema);

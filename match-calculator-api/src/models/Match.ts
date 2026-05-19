@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { MatchStatus } from '../types';
+import { matchDb } from '../config/db';
 
 export interface IMatchDocument extends Document {
   senderId: string;
@@ -25,4 +26,4 @@ const MatchSchema = new Schema<IMatchDocument>(
 
 MatchSchema.index({ senderId: 1, receiverId: 1 }, { unique: true });
 
-export default mongoose.model<IMatchDocument>('Match', MatchSchema);
+export default matchDb.model<IMatchDocument>('Match', MatchSchema);

@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { matchDb } from '../config/db';
 
 export interface IConnectCodeDocument extends Document {
   userId: string;
@@ -17,4 +18,4 @@ const ConnectCodeSchema = new Schema<IConnectCodeDocument>(
 
 ConnectCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export default mongoose.model<IConnectCodeDocument>('ConnectCode', ConnectCodeSchema);
+export default matchDb.model<IConnectCodeDocument>('ConnectCode', ConnectCodeSchema);
