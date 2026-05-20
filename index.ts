@@ -16,7 +16,7 @@ async function start() {
   const { errorHandler } = await import('./auth/src/middleware/errorHandler');
 
   const app = express();
-  const PORT = process.env.PORT ?? 5000;
+  const PORT = process.env.PORT ?? 5002;
   const allowedOrigins = (process.env.CLIENT_ORIGINS ?? '').split(',').map((o) => o.trim());
 
   app.use(helmet());
