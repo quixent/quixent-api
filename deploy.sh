@@ -2,8 +2,8 @@
 
 set -e
 
-IMAGE_NAME="Quixent-api"
-CONTAINER_NAME="Quixent-api-container"
+IMAGE_NAME="quixent-api"
+CONTAINER_NAME="quixent-api-container"
 ENV_FILE=".env"
 HOST_PORT=5002
 CONTAINER_PORT=5002
@@ -18,7 +18,7 @@ echo "🛑 Stopping existing container..."
 docker stop $CONTAINER_NAME 2>/dev/null || true
 docker rm $CONTAINER_NAME 2>/dev/null || true
 
-echo "🚀 Building Docker image..Quixent API."
+echo "🚀 Building Docker image..."
 docker build -t $IMAGE_NAME .
 
 echo "▶️ Running container..."
