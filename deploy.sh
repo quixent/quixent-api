@@ -5,8 +5,8 @@ set -e
 IMAGE_NAME="quixent-api"
 CONTAINER_NAME="quixent-api-container"
 ENV_FILE=".env"
-HOST_PORT=5002
-CONTAINER_PORT=5002
+HOST_PORT=8000
+CONTAINER_PORT=8000
 
 echo "🔍 Checking .env file..."
 if [ ! -f "$ENV_FILE" ]; then
