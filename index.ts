@@ -24,13 +24,24 @@ async function start() {
   app.use(express.json());
   app.use(cookieParser());
 
-  app.get('/health', (_req, res) => {
-    res.json({ success: true, status: 'ok', uptime: Math.floor(process.uptime()) });
-  });
+  app.get('/health', (req, res) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - IP: ${req.ip}`);
 
-  app.get('/test', (_req, res) => {
-    res.json({ success: true, message: 'Quixent API is working' });
+  res.json({
+    success: true,
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
   });
+});
+
+app.get('/test', (req, res) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - IP: ${req.ip}`);
+
+  res.json({
+    success: true,
+    message: '🚀 Quixent API Starting...',
+  });
+});
 
   app.use('/auth', authRouter);
   app.use('/match', matchRouter);
