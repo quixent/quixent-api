@@ -42,7 +42,7 @@ npm install
 Create a `.env` file in this folder:
 
 ```env
-PORT=5000
+PORT=8000
 NODE_ENV=development
 CLIENT_ORIGINS=http://localhost:8081
 
@@ -63,7 +63,7 @@ TWOFACTOR_OTP_TEMPLATE=General Otp
 TWOFACTOR_THANKS_TEMPLATE=General Thanking Template
 TWOFACTOR_SENDER_ID=QUIXNT
 
-AUTH_API_URL=http://localhost:5000
+AUTH_API_URL=http://localhost:8000
 ```
 
 ---
