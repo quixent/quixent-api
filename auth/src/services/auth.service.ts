@@ -7,6 +7,7 @@ import { generateOtp } from '../utils/generateOtp';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateTokens';
 import { RefreshTokenPayload } from '../types';
 import { sendOtpSms } from './sms.service';
+import { uploadToS3 } from '../config/s3.config';
 
 const OTP_EXPIRY_MS        = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS      = 60 * 1000;
@@ -131,6 +132,7 @@ export const verifyOtpService = async (mobile: string, code: string) => {
       gender: user.gender,
       age: user.age,
       role: user.role,
+      profileImage: user.profileImage,
     },
   };
 };
@@ -171,7 +173,7 @@ export const getMeService = async (userId: string) => {
 };
 
 export const getUserByIdService = async (userId: string) => {
-  const user = await User.findById(userId).select('name gender age city');
+  const user = await User.findById(userId).select('name gender age city profileImage');
   if (!user) {
     throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
   }
@@ -180,7 +182,7 @@ export const getUserByIdService = async (userId: string) => {
 
 export const updateProfileService = async (
   userId: string,
-  data: { name?: string; gender?: string; age?: number; city?: string; bio?: string },
+  data: { name?: string; gender?: string; age?: number; city?: string; bio?: string; profileImage?: string },
 ) => {
   if (data.gender && !['male', 'female'].includes(data.gender)) {
     throw { status: 400, message: 'gender must be male or female.', error: 'INVALID_INPUT' };
@@ -194,6 +196,21 @@ export const updateProfileService = async (
     throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
   }
   return user;
+};
+
+export const uploadProfileImageService = async (
+  userId: string,
+  base64: string,
+  mimetype: string,
+) => {
+  const imageUrl = await uploadToS3(base64, mimetype, 'Profile-images');
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { profileImage: imageUrl },
+    { new: true },
+  ).select('-__v');
+  if (!user) throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
+  return { profileImage: imageUrl, user };
 };
 
 export const deleteAccountService = async (userId: string) => {

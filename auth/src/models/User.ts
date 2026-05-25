@@ -9,6 +9,7 @@ export interface IUserDocument extends Document {
   age: number;
   city: string;
   bio: string;
+  profileImage: string;
   isActive: boolean;
   role: 'user' | 'admin';
   lastLogin: Date;
@@ -23,6 +24,7 @@ const UserSchema = new Schema<IUserDocument>(
     age: { type: Number, default: null },
     city: { type: String, default: '', trim: true },
     bio: { type: String, default: '', trim: true, maxlength: 200 },
+    profileImage: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     lastLogin: { type: Date, default: null },

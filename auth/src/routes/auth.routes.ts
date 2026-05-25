@@ -9,6 +9,7 @@ import {
   getMe,
   getUserById,
   updateProfile,
+  uploadProfileImage,
   deleteAccount,
 } from '../controllers/auth.controller';
 
@@ -22,6 +23,7 @@ router.get('/me', verifyToken, getMe);
 router.get('/user/:id', verifyToken, getUserById);
 router.put('/update-profile', verifyToken, updateProfile);
 router.post('/profile', verifyToken, updateProfile);
+router.post('/upload-profile-image', verifyToken, uploadProfileImage);
 router.delete('/delete-account', verifyToken, deleteAccount);
 
 export default router;
