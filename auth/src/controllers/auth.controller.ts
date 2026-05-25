@@ -9,6 +9,7 @@ import {
   getMeService,
   getUserByIdService,
   updateProfileService,
+  uploadProfileImageService,
   deleteAccountService,
 } from '../services/auth.service';
 
@@ -97,11 +98,25 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, gender, age, city, bio } = req.body;
-    const user = await updateProfileService(req.user!.userId, { name, gender, age, city, bio });
+    const { name, gender, age, city, bio, profileImage } = req.body;
+    const user = await updateProfileService(req.user!.userId, { name, gender, age, city, bio, profileImage });
     sendSuccess(res, 'Profile updated', { user });
   } catch (err: any) {
     sendError(res, err.message ?? 'Failed to update profile', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
+
+export const uploadProfileImage = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { image, mimetype } = req.body;
+    if (!image || !mimetype) {
+      sendError(res, 'image (base64) and mimetype are required', 'INVALID_INPUT', 400);
+      return;
+    }
+    const result = await uploadProfileImageService(req.user!.userId, image, mimetype);
+    sendSuccess(res, 'Profile image uploaded', result);
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to upload image', err.error ?? 'SERVER_ERROR', err.status ?? 500);
   }
 };
 

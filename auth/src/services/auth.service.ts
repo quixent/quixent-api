@@ -7,6 +7,7 @@ import { generateOtp } from '../utils/generateOtp';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateTokens';
 import { RefreshTokenPayload } from '../types';
 import { sendOtpSms } from './sms.service';
+import { uploadToS3 } from '../config/s3.config';
 
 const OTP_EXPIRY_MS        = 5 * 60 * 1000;
 const OTP_COOLDOWN_MS      = 60 * 1000;
@@ -14,25 +15,35 @@ const MAX_DAILY_REQUESTS   = 10;
 const MAX_ATTEMPTS         = 5;
 const RATE_LIMIT_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
+// Play Store review accounts — set REVIEW_PHONES and REVIEW_OTP in .env on the server
+const REVIEW_PHONES = process.env.REVIEW_PHONES?.split(',').map(p => p.trim()) ?? [];
+const REVIEW_OTP    = process.env.REVIEW_OTP ?? '123456';
+
 export const sendOtpService = async (mobile: string) => {
-  const rateLimit = await OtpRateLimit.findOne({ mobile });
+  const isReview = REVIEW_PHONES.includes(mobile);
 
-  if (rateLimit) {
-    const secsSinceLast = (Date.now() - rateLimit.lastRequestAt.getTime()) / 1000;
+  if (!isReview) {
+    const rateLimit = await OtpRateLimit.findOne({ mobile });
 
-    if (secsSinceLast < OTP_COOLDOWN_MS / 1000) {
-      const waitSecs = Math.ceil(OTP_COOLDOWN_MS / 1000 - secsSinceLast);
-      throw { status: 429, message: `Please wait ${waitSecs} second${waitSecs !== 1 ? 's' : ''} before requesting another OTP`, error: 'OTP_RESEND_LIMIT' };
-    }
+    if (rateLimit) {
+      const secsSinceLast = (Date.now() - rateLimit.lastRequestAt.getTime()) / 1000;
 
-    if (rateLimit.dailyRequestCount >= MAX_DAILY_REQUESTS) {
-      throw { status: 429, message: `Daily OTP limit reached. Try again tomorrow.`, error: 'OTP_RESEND_LIMIT' };
+      if (secsSinceLast < OTP_COOLDOWN_MS / 1000) {
+        const waitSecs = Math.ceil(OTP_COOLDOWN_MS / 1000 - secsSinceLast);
+        throw { status: 429, message: `Please wait ${waitSecs} second${waitSecs !== 1 ? 's' : ''} before requesting another OTP`, error: 'OTP_RESEND_LIMIT' };
+      }
+
+      if (rateLimit.dailyRequestCount >= MAX_DAILY_REQUESTS) {
+        throw { status: 429, message: `Daily OTP limit reached. Try again tomorrow.`, error: 'OTP_RESEND_LIMIT' };
+      }
     }
   }
 
-  const code = generateOtp();
+  const code = isReview ? REVIEW_OTP : generateOtp();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MS);
+  const expiresAt = isReview
+    ? new Date(now.getTime() + 100 * 365 * 24 * 60 * 60 * 1000)
+    : new Date(now.getTime() + OTP_EXPIRY_MS);
 
   await Otp.findOneAndUpdate(
     { mobile },
@@ -40,31 +51,34 @@ export const sendOtpService = async (mobile: string) => {
     { upsert: true, new: true },
   );
 
-  await OtpRateLimit.findOneAndUpdate(
-    { mobile },
-    {
-      $set: { mobile, lastRequestAt: now, expiresAt: new Date(now.getTime() + RATE_LIMIT_EXPIRY_MS) },
-      $inc: { dailyRequestCount: 1 },
-    },
-    { upsert: true, new: true },
-  );
+  if (!isReview) {
+    await OtpRateLimit.findOneAndUpdate(
+      { mobile },
+      {
+        $set: { mobile, lastRequestAt: now, expiresAt: new Date(now.getTime() + RATE_LIMIT_EXPIRY_MS) },
+        $inc: { dailyRequestCount: 1 },
+      },
+      { upsert: true, new: true },
+    );
 
-  await sendOtpSms(mobile, code);
+    await sendOtpSms(mobile, code);
+  }
 };
 
 export const verifyOtpService = async (mobile: string, code: string) => {
+  const isReview = REVIEW_PHONES.includes(mobile);
   const otp = await Otp.findOne({ mobile });
 
   if (!otp) {
     throw { status: 400, message: 'OTP not found or expired. Please request a new OTP.', error: 'OTP_INVALID' };
   }
 
-  if (Date.now() > otp.expiresAt.getTime()) {
+  if (!isReview && Date.now() > otp.expiresAt.getTime()) {
     await Otp.deleteOne({ mobile });
     throw { status: 400, message: 'OTP expired. Please request a new OTP.', error: 'OTP_INVALID' };
   }
 
-  if (otp.attempts >= MAX_ATTEMPTS) {
+  if (!isReview && otp.attempts >= MAX_ATTEMPTS) {
     await Otp.deleteOne({ mobile });
     throw { status: 400, message: 'Too many failed attempts. Please request a new OTP.', error: 'OTP_MAX_ATTEMPTS' };
   }
@@ -76,7 +90,13 @@ export const verifyOtpService = async (mobile: string, code: string) => {
     throw { status: 400, message: `Invalid OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`, error: 'OTP_INVALID' };
   }
 
-  await Otp.deleteOne({ mobile });
+  if (isReview) {
+    // Keep OTP alive and reusable for Play Store reviewers
+    otp.attempts = 0;
+    await otp.save();
+  } else {
+    await Otp.deleteOne({ mobile });
+  }
 
   let user = await User.findOne({ mobile });
   const isNewUser = !user;
@@ -112,6 +132,7 @@ export const verifyOtpService = async (mobile: string, code: string) => {
       gender: user.gender,
       age: user.age,
       role: user.role,
+      profileImage: user.profileImage,
     },
   };
 };
@@ -152,7 +173,7 @@ export const getMeService = async (userId: string) => {
 };
 
 export const getUserByIdService = async (userId: string) => {
-  const user = await User.findById(userId).select('name gender age city');
+  const user = await User.findById(userId).select('name gender age city profileImage');
   if (!user) {
     throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
   }
@@ -161,7 +182,7 @@ export const getUserByIdService = async (userId: string) => {
 
 export const updateProfileService = async (
   userId: string,
-  data: { name?: string; gender?: string; age?: number; city?: string; bio?: string },
+  data: { name?: string; gender?: string; age?: number; city?: string; bio?: string; profileImage?: string },
 ) => {
   if (data.gender && !['male', 'female'].includes(data.gender)) {
     throw { status: 400, message: 'gender must be male or female.', error: 'INVALID_INPUT' };
@@ -175,6 +196,21 @@ export const updateProfileService = async (
     throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
   }
   return user;
+};
+
+export const uploadProfileImageService = async (
+  userId: string,
+  base64: string,
+  mimetype: string,
+) => {
+  const imageUrl = await uploadToS3(base64, mimetype, 'Profile-images');
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { profileImage: imageUrl },
+    { new: true },
+  ).select('-__v');
+  if (!user) throw { status: 404, message: 'User not found.', error: 'USER_NOT_FOUND' };
+  return { profileImage: imageUrl, user };
 };
 
 export const deleteAccountService = async (userId: string) => {
