@@ -5,6 +5,7 @@ import { getQuestionsForMatchService } from '../services/question.service';
 import {
   generateConnectCodeService,
   getMyConnectCodeService,
+  savePushTokenService,
   sendMatchRequestService,
   getMyMatchesService,
   getMatchByIdService,
@@ -15,6 +16,20 @@ import {
   getMessagesService,
   sendMessageService,
 } from '../services/match.service';
+
+export const savePushToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      sendError(res, 'token is required', 'INVALID_INPUT', 400);
+      return;
+    }
+    await savePushTokenService(req.user!.userId, token);
+    sendSuccess(res, 'Push token saved', {});
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to save push token', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
 
 export const generateConnectCode = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

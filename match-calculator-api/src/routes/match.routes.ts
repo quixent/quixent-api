@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
 import {
+  savePushToken,
   generateConnectCode,
   generateConnectCodeFlat,
   getMyConnectCode,
@@ -27,6 +28,7 @@ router.get('/connect-code/my', verifyToken, getMyConnectCode);
 router.post('/request', verifyToken, sendMatchRequest);
 
 // Flat routes matching frontend API client (must be before /:id wildcard)
+router.post('/push-token', verifyToken, savePushToken);
 router.post('/generate-code', verifyToken, generateConnectCodeFlat);
 router.post('/connect-by-code', verifyToken, connectByCode);
 router.get('/questions', verifyToken, getQuestionsFlat);
