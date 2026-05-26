@@ -47,6 +47,18 @@ export const getMyConnectCodeService = async (userId: string) => {
   return connectCode;
 };
 
+export const deleteUserDataService = async (userId: string) => {
+  const matches = await Match.find({ $or: [{ senderId: userId }, { receiverId: userId }] });
+  const matchIds = matches.map((m) => m._id);
+  await Answer.deleteMany({ userId });
+  await Message.deleteMany({ senderId: userId });
+  await Answer.deleteMany({ matchId: { $in: matchIds } });
+  await Message.deleteMany({ matchId: { $in: matchIds } });
+  await Match.deleteMany({ $or: [{ senderId: userId }, { receiverId: userId }] });
+  await ConnectCode.deleteMany({ userId });
+  await PushToken.deleteOne({ userId });
+};
+
 export const savePushTokenService = async (userId: string, token: string) => {
   await PushToken.findOneAndUpdate(
     { userId },
