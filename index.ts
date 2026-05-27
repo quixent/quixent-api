@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -42,6 +43,10 @@ app.get('/test', (req, res) => {
     message: '🚀 Quixent API Starting...',
   });
 });
+
+  app.get('/delete-account', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'delete-account.html'));
+  });
 
   app.use('/auth', authRouter);
   app.use('/match', matchRouter);

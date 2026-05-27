@@ -5,6 +5,8 @@ import Answer from '../models/Answer';
 import ConnectCode from '../models/ConnectCode';
 import Question from '../models/Question';
 import Message from '../models/Message';
+import PushToken from '../models/PushToken';
+import { sendPushNotification } from '../utils/notifications';
 import { ScoreResult, ActiveMatch, ChatMessage } from '../types';
 
 async function fetchUserProfile(userId: string, token: string) {
@@ -45,6 +47,26 @@ export const getMyConnectCodeService = async (userId: string) => {
   return connectCode;
 };
 
+export const deleteUserDataService = async (userId: string) => {
+  const matches = await Match.find({ $or: [{ senderId: userId }, { receiverId: userId }] });
+  const matchIds = matches.map((m) => m._id);
+  await Answer.deleteMany({ userId });
+  await Message.deleteMany({ senderId: userId });
+  await Answer.deleteMany({ matchId: { $in: matchIds } });
+  await Message.deleteMany({ matchId: { $in: matchIds } });
+  await Match.deleteMany({ $or: [{ senderId: userId }, { receiverId: userId }] });
+  await ConnectCode.deleteMany({ userId });
+  await PushToken.deleteOne({ userId });
+};
+
+export const savePushTokenService = async (userId: string, token: string) => {
+  await PushToken.findOneAndUpdate(
+    { userId },
+    { userId, token },
+    { upsert: true, new: true },
+  );
+};
+
 export const sendMatchRequestService = async (senderId: string, code: string) => {
   const connectCode = await ConnectCode.findOne({ code });
   if (!connectCode) {
@@ -69,6 +91,7 @@ export const sendMatchRequestService = async (senderId: string, code: string) =>
   }
 
   const match = await Match.create({ senderId, receiverId, status: 'accepted' });
+  sendPushNotification(receiverId, 'New Match!', 'Someone connected with you on Ansora 💑');
   return match;
 };
 
@@ -217,6 +240,8 @@ export const submitSingleAnswerService = async (
     match.status = 'complete';
     match.compatibilityScore = score.compatibility;
     await match.save();
+    sendPushNotification(match.senderId, 'Score Ready! 🎉', `Your compatibility score is ${score.compatibility}%`);
+    sendPushNotification(match.receiverId, 'Score Ready! 🎉', `Your compatibility score is ${score.compatibility}%`);
   }
 
   return { answered, total };
@@ -269,6 +294,8 @@ export const sendMessageService = async (
     throw { status: 403, message: 'Access denied.', error: 'UNAUTHORIZED' };
   }
   const message = await Message.create({ matchId, senderId: userId, senderName, text });
+  const partnerId = match.senderId === userId ? match.receiverId : match.senderId;
+  sendPushNotification(partnerId, senderName, text);
   return {
     _id: (message._id as mongoose.Types.ObjectId).toString(),
     senderId: { _id: userId, name: senderName },
@@ -290,21 +317,27 @@ async function calculateCompatibilityScore(
   const userAMap = new Map(userAAnswers.map((a) => [a.questionId.toString(), a.optionId.toString()]));
   const userBMap = new Map(userBAnswers.map((a) => [a.questionId.toString(), a.optionId.toString()]));
 
-  let totalPoints = 0;
   let earnedPoints = 0;
   const breakdown: ScoreResult['breakdown'] = [];
 
   for (const question of questions) {
-    const maxWeight = Math.max(...question.options.map((o) => o.weight));
-    totalPoints += maxWeight;
-
     const aOptId = userAMap.get(question._id.toString());
     const bOptId = userBMap.get(question._id.toString());
 
     const aOpt = question.options.find((o) => o._id.toString() === aOptId);
     const bOpt = question.options.find((o) => o._id.toString() === bOptId);
 
-    const points = aOpt && bOpt && aOptId === bOptId ? aOpt.weight : 0;
+    let points = 0;
+    if (aOpt && bOpt) {
+      if (aOptId === bOptId) {
+        points = 10;
+      } else {
+        const gap = Math.abs(aOpt.weight - bOpt.weight);
+        if (gap <= 1) points = 6;
+        else if (gap <= 2) points = 4;
+        else points = 2;
+      }
+    }
     earnedPoints += points;
 
     breakdown.push({
@@ -316,6 +349,7 @@ async function calculateCompatibilityScore(
     });
   }
 
+  const totalPoints = questions.length * 10;
   const compatibility = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
   return {

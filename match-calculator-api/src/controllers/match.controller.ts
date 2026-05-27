@@ -1,10 +1,12 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/verifyToken';
 import { sendSuccess, sendError } from '../utils/apiResponse';
 import { getQuestionsForMatchService } from '../services/question.service';
 import {
+  deleteUserDataService,
   generateConnectCodeService,
   getMyConnectCodeService,
+  savePushTokenService,
   sendMatchRequestService,
   getMyMatchesService,
   getMatchByIdService,
@@ -15,6 +17,36 @@ import {
   getMessagesService,
   sendMessageService,
 } from '../services/match.service';
+
+export const deleteUserData = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const secret = req.headers['x-internal-secret'];
+    if (secret !== (process.env.INTERNAL_SECRET ?? '')) {
+      res.status(403).json({ success: false, message: 'Forbidden' });
+      return;
+    }
+    const { userId } = req.body;
+    if (!userId) { res.status(400).json({ success: false, message: 'userId required' }); return; }
+    await deleteUserDataService(userId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const savePushToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      sendError(res, 'token is required', 'INVALID_INPUT', 400);
+      return;
+    }
+    await savePushTokenService(req.user!.userId, token);
+    sendSuccess(res, 'Push token saved', {});
+  } catch (err: any) {
+    sendError(res, err.message ?? 'Failed to save push token', err.error ?? 'SERVER_ERROR', err.status ?? 500);
+  }
+};
 
 export const generateConnectCode = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

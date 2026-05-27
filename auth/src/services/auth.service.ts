@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import axios from 'axios';
 import User from '../models/User';
 import Otp from '../models/Otp';
 import OtpRateLimit from '../models/OtpRateLimit';
@@ -214,6 +215,22 @@ export const uploadProfileImageService = async (
 };
 
 export const deleteAccountService = async (userId: string) => {
-  await User.findByIdAndUpdate(userId, { isActive: false });
+  const user = await User.findById(userId);
+  if (user) {
+    await Otp.deleteMany({ mobile: user.mobile });
+    await OtpRateLimit.deleteMany({ mobile: user.mobile });
+  }
   await Token.deleteMany({ userId });
+  await User.findByIdAndDelete(userId);
+
+  // Fire-and-forget: clean up match data on the match service
+  try {
+    await axios.delete(`${process.env.AUTH_API_URL?.replace('/auth', '')}/match/user-data`, {
+      headers: { 'x-internal-secret': process.env.INTERNAL_SECRET ?? '' },
+      data: { userId },
+      timeout: 5000,
+    });
+  } catch {
+    // non-critical — orphaned match data does not contain PII
+  }
 };

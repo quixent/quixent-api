@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
 import {
+  deleteUserData,
+  savePushToken,
   generateConnectCode,
   generateConnectCodeFlat,
   getMyConnectCode,
@@ -26,7 +28,11 @@ router.post('/connect-code/generate', verifyToken, generateConnectCode);
 router.get('/connect-code/my', verifyToken, getMyConnectCode);
 router.post('/request', verifyToken, sendMatchRequest);
 
+// Internal route — called by auth service on account deletion
+router.delete('/user-data', deleteUserData);
+
 // Flat routes matching frontend API client (must be before /:id wildcard)
+router.post('/push-token', verifyToken, savePushToken);
 router.post('/generate-code', verifyToken, generateConnectCodeFlat);
 router.post('/connect-by-code', verifyToken, connectByCode);
 router.get('/questions', verifyToken, getQuestionsFlat);
