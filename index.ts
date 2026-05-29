@@ -45,7 +45,7 @@ app.get('/test', (req, res) => {
 });
 
   app.get('/delete-account', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'delete-account.html'));
+    res.sendFile(path.join(process.cwd(), 'public', 'delete-account.html'));
   });
 
   app.use('/auth', authRouter);
